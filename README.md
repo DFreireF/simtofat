@@ -1,2 +1,2 @@
-# simtofat
+# SimToFAT
 Extended version of pysimtof
