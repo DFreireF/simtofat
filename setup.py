@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from iqtools.version import __version__
+from simtofat.version import __version__
 from pathlib import Path
 
 this_directory = Path(__file__).parent
@@ -24,11 +24,11 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='DFreireF',
-    url='https://github.com/DFreireF/pysimtofat',
-    download_url=f'https://github.com/DFreireF/pysimtofat/tarball/{__version__}',
+    url='https://github.com/DFreireF/simtofat',
+    download_url=f'https://github.com/DFreireF/simtofat/tarball/{__version__}',
     entry_points={
         'console_scripts': [
-            'pysimtofat = pysimtofat.__main__:main'
+            'simtofat = simtofat.__main__:main'
         ]
     },
     license='GPLv3',
