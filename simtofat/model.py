@@ -7,15 +7,12 @@ import numpy as np
 
 
 def get_all_in_moq_window(moq_cen, moq_span, ame_data=None, ring=None):
-    if ame_data:
-        ame_data = ame_data
-    else:
+    if not ame_data:
         ame = AMEData()
         ame_data = ame.ame_table
-    if ring:
-        ring = ring
-    else:
+    if not ring:
         ring = Ring('ESR', 108.43)
+    
     moq_window=np.array([])
     p=Particle(1, 1, ame_data, ring)
     particles=p.get_all_in_all()
@@ -24,6 +21,8 @@ def get_all_in_moq_window(moq_cen, moq_span, ame_data=None, ring=None):
         if (moq >= moq_cen - moq_span / 2 and moq <= moq_cen + moq_span / 2):
             moq_window = np.append(moq_window, particle)
     return moq_window
+
+#def srf
 
 def import_particles_from_lise(lisefile):
     lise_file = LISEreader(lisefile)
@@ -49,12 +48,10 @@ def main():
     ref_iso = '72Ge'
     brho = 6.9303
     gammat = 1.395
-    delta_f = 6e3
-    imp = ImportData()
-    imp.set_ref_ion(ref_iso, charge)
-    imp._import('e.lpp')
-    imp._calculate(brho, gammat, charge)
-    e_isomer = get_energy_isomer(delta_f, imp.moq[imp.ref_ion], charge, imp.frequence_rel, gammat, 209)
+    delta_f = 2e3
+    imp = ImportData(ref_iso, charge, brho, gammat)
+    imp._calculate_srrf([Particle(32, 40, AMEData(), imp.ring)])
+    e_isomer = get_energy_isomer(delta_f, imp.moq['72Ge+32'], charge, imp.frequence_rel, gammat, 209)
     print(e_isomer)
 
 if __name__ == '__main__':
