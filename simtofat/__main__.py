@@ -65,22 +65,39 @@ def read_csv(filename):
 
 def ntcap_data(filename, nframes = 4096, lframes = 2**18, csv = False, root = False, plot = False):
     iq = get_iq_object(filename)
+    print('iq got')
     iq.read_complete_file()
-    xx, yy, zz = iq.get_spectrogram(lframes = lframes, nframes = nframes)
+    print('read complete')
+    xx, yy, zz = iq.get_spectrogram(lframes = 2**18, nframes = nframes)
+    print('got spectr')
     xa, ya, za = get_averaged_spectrogram(xx, yy, zz, every = nframes)
-    if csv: write_spectrum_to_root(xa[0], za[0], filename, center = iq.center, title = filename)
-    if root: write_spectrum_to_csv(xa[0], za[0], filename, center = iq.center)
-    if plot: plot_spectrum(xa[0], za[0], cen = iq.center, filename = filename, title = filename)
-    return xa[0, :], za[0, :]
+    import gc
+    del(xx)
+    del(yy)
+    del(zz)
+    gc.collect()
+    #for name in dir():
+     #   if name == 'xx' or name == 'yy' or name == 'zz':
+      #      del globals()[name]
+    
+    print('averaging')
+    if root: write_spectrum_to_root(xa[0], za[0], filename, center = iq.center, title = filename)
+    elif csv: write_spectrum_to_csv(xa[0], za[0], filename = filename, center = iq.center)
+    elif plot: plot_spectrum(xa[0], za[0], cen = iq.center, filename = filename, title = filename)
+    else: return  (np.stack((xa[0, :], za[0, :]), axis = 1).reshape((len(xa[0, :]), 2)))
 
 def controller(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+    
+    '''
+    We use as experimental data a root file containing a histogram with the data
+    '''
 
     mydata = ImportData(refisotope, refcharge, brho, gammat)
     mydata._set_secondary_args(lise_file, harmonics)
     mydata._calculate_srrf() # -> moq ; srrf
     mydata._simulated_data() # -> simulated frecs
     
-    exp_data = filename                  
+    exp_data = filename   # pass directly root file               
     mycanvas = CreateGUI(refisotope, mydata.nuclei_names, ndivs, dops)
     mycanvas._view(exp_data, mydata.simulated_data_dict, filename)
     
@@ -91,14 +108,60 @@ def controller(filename, lise_file, harmonics, brho, gammat, refisotope, refchar
 
 def controller1(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
     
+    '''
+    We read the experimental data from a csv file containing frecuency and power
+    '''
+    
     exp_data = read_csv(filename)
     mydata = ImportData(refisotope, refcharge, brho, gammat)
     mydata._set_secondary_args(lise_file, harmonics)
     mydata._calculate_srrf() # -> moq ; srrf
     mydata._simulated_data() # -> simulated frecs
                                                    
-    mycanvas = CreateGUI(exp_data, mydata.simulated_data_dict, ref_nuclei, mydata.nuclei_names, ndivs, filename)
-    mycanvas._set_args(dops)
+    mycanvas = CreateGUI(refisotope, mydata.nuclei_names, ndivs, dops)
+    mycanvas._view(exp_data, mydata.simulated_data_dict, filename)
+    
+    date_time = datetime.now().strftime('%Y.%m.%d_%H.%M.%S')
+    info_name = f'{outfilepath}{date_time}_b{brho}_g{gammat}'
+    if spdf: mycanvas.save_pdf(info_name)
+    if sroot: mycanvas.save_root(info_name)
+    
+def controller2(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+    
+    '''
+    We process the NTCAP data: ex. /lustre/ap/litv-exp/2021-05-00_E143_TwoPhotonDeday_ssanjari/NTCAP/iq/IQ_2021-05-08_19-51-35/0000050.iq.tdms
+    '''
+    
+    exp_data = ntcap_data(filename)
+    mydata = ImportData(refisotope, refcharge, brho, gammat)
+    mydata._set_secondary_args(lise_file, harmonics)
+    mydata._calculate_srrf() # -> moq ; srrf
+    mydata._simulated_data() # -> simulated frecs
+                                                   
+    mycanvas = CreateGUI(refisotope, mydata.nuclei_names, ndivs, dops)
+    mycanvas._view(exp_data, mydata.simulated_data_dict, filename)
+    
+    date_time = datetime.now().strftime('%Y.%m.%d_%H.%M.%S')
+    info_name = f'{outfilepath}{date_time}_b{brho}_g{gammat}'
+    if spdf: mycanvas.save_pdf(info_name)
+    if sroot: mycanvas.save_root(info_name)
+
+def controller3(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+    
+    '''
+    We process the NTCAP data: ex. /lustre/ap/litv-exp/2021-05-00_E143_TwoPhotonDeday_ssanjari/NTCAP/iq/IQ_2021-05-08_19-51-35/0000050.iq.tdms
+    '''
+    
+    mydata = ImportData(refisotope, refcharge, brho, gammat)
+    mydata._set_secondary_args(lise_file, harmonics)
+    mydata._calculate_srrf() # -> moq ; srrf
+    mydata._simulated_data() # -> simulated frecs
+
+    ntcap_data(filename, root = True)
+    exp_data = filename + '.root'
+    mycanvas = CreateGUI(refisotope, mydata.nuclei_names, ndivs, dops)
+    mycanvas._view(exp_data, mydata.simulated_data_dict, filename)
+    
     date_time = datetime.now().strftime('%Y.%m.%d_%H.%M.%S')
     info_name = f'{outfilepath}{date_time}_b{brho}_g{gammat}'
     if spdf: mycanvas.save_pdf(info_name)
