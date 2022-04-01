@@ -1,10 +1,11 @@
 import argparse
+import os
 import logging as log
 from datetime import datetime
 from pysimtof.importdata import *
 from pysimtof.creategui import *
+from simtofat.model import *
 from iqtools import *
-import os
 
 
 def main():
@@ -36,17 +37,31 @@ def main():
     parser.add_argument('-r', '--sroot',
                         help = 'Save canvas to root.', action = 'store_true')
     
-    parser.add_argument('-re', '--read',
-                        help = 'Read frecuency and power already processed.', action = 'store_true')
+    parser.add_argument('-im', '--imoq',
+                        help = 'Identify moq window', action = 'store_true')
+    parser.add_argument('-ir', '--iroot',
+                        help = 'Identify LISE particles in root spectrum', action = 'store_true')
+    parser.add_argument('-ic', '--icsv',
+                        help = 'Identify LISE particles in spectrum readed from csv file', action = 'store_true')
+    parser.add_argument('-in', '--intcap',
+                        help = 'Identify LISE particles in a tdms file', action = 'store_true')
+    parser.add_argument('-inr', '--introot',
+                        help = 'Identify process tdms data, write to root, and read it and apply identification of LISE', action = 'store_true')
+
 
     args = parser.parse_args()
 
     print(f'Running {scriptname}')
     if args.verbose: log.basicConfig(level = log.DEBUG)
     if args.outdir: outfilepath = os.path.join(args.outdir, '')
+    if args.intcap: identification_ntcap(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot, args.time, args.skip)
+    if args.iroot: identification_root(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
+    if args.icsv: identification_csv(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
+    if args.introot: identification_ntcap_root(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
+    if args.imoq: identification_moq_window(args.moq_cen, args.moq_span, args.ref_nuclei, args.ref_charge, args.brho, args.gammat, args.lise_file, args.harmonics, args.filename[0], args.data_time, args.skip_time, args.binning):
     
     #if args.read:
-    controller(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
+    controller2
         
 def read_masterfile(master_filename):
     # reads list filenames with experiment data. [:-1] to remove eol sequence.
@@ -63,30 +78,37 @@ def read_csv(filename):
             p = np.append(p, float(l[1]))
     return (np.stack((f, p), axis = 1).reshape((len(f), 2)))
 
-def ntcap_data(filename, nframes = 4096, lframes = 2**18, csv = False, root = False, plot = False):
+def ntcap_data(filename, lframes = 2**18, data_time = 1, skip_time = 2,csv = False, root = False, plot = False, read_all = False):
     iq = get_iq_object(filename)
     print('iq got')
-    iq.read_complete_file()
+    if not read_all:
+        nframes = int(data_time * iq.fs / lframes)
+        sframes = int(skip_time * iq.fs / lframes)
+        iq.read(nframes = nframes, lframes = lframes, sframes = sframes)
+    else:
+        nframes = 4096
+        iq.read_complete_file()
     print('read complete')
-    xx, yy, zz = iq.get_spectrogram(lframes = 2**18, nframes = nframes)
-    print('got spectr')
+    xx, yy, zz = iq.get_spectrogram(nframes = nframes, lframes = lframes)
+    print('spectrogram got')
     xa, ya, za = get_averaged_spectrogram(xx, yy, zz, every = nframes)
+    print('average done')
     import gc
     del(xx)
     del(yy)
     del(zz)
     gc.collect()
+    print('memory released')
     #for name in dir():
      #   if name == 'xx' or name == 'yy' or name == 'zz':
       #      del globals()[name]
     
-    print('averaging')
     if root: write_spectrum_to_root(xa[0], za[0], filename, center = iq.center, title = filename)
     elif csv: write_spectrum_to_csv(xa[0], za[0], filename = filename, center = iq.center)
     elif plot: plot_spectrum(xa[0], za[0], cen = iq.center, filename = filename, title = filename)
     else: return  (np.stack((xa[0, :], za[0, :]), axis = 1).reshape((len(xa[0, :]), 2)))
 
-def controller(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+def identification_root(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
     
     '''
     We use as experimental data a root file containing a histogram with the data
@@ -106,7 +128,7 @@ def controller(filename, lise_file, harmonics, brho, gammat, refisotope, refchar
     if spdf: mycanvas.save_pdf(info_name)
     if sroot: mycanvas.save_root(info_name)
 
-def controller1(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+def identification_csv(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
     
     '''
     We read the experimental data from a csv file containing frecuency and power
@@ -126,15 +148,16 @@ def controller1(filename, lise_file, harmonics, brho, gammat, refisotope, refcha
     if spdf: mycanvas.save_pdf(info_name)
     if sroot: mycanvas.save_root(info_name)
     
-def controller2(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+def identification_ntcap(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot, data_time, skip_time):
     
     '''
     We process the NTCAP data: ex. /lustre/ap/litv-exp/2021-05-00_E143_TwoPhotonDeday_ssanjari/NTCAP/iq/IQ_2021-05-08_19-51-35/0000050.iq.tdms
     '''
     
-    exp_data = ntcap_data(filename)
+    exp_data = ntcap_data(filename, data_time = data_time, skip_time = skip_time)
     mydata = ImportData(refisotope, refcharge, brho, gammat)
     mydata._set_secondary_args(lise_file, harmonics)
+    mydata.calculate_moqs()
     mydata._calculate_srrf() # -> moq ; srrf
     mydata._simulated_data() # -> simulated frecs
                                                    
@@ -146,7 +169,7 @@ def controller2(filename, lise_file, harmonics, brho, gammat, refisotope, refcha
     if spdf: mycanvas.save_pdf(info_name)
     if sroot: mycanvas.save_root(info_name)
 
-def controller3(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
+def identification_ntcap_root(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
     
     '''
     We process the NTCAP data: ex. /lustre/ap/litv-exp/2021-05-00_E143_TwoPhotonDeday_ssanjari/NTCAP/iq/IQ_2021-05-08_19-51-35/0000050.iq.tdms
@@ -166,6 +189,35 @@ def controller3(filename, lise_file, harmonics, brho, gammat, refisotope, refcha
     info_name = f'{outfilepath}{date_time}_b{brho}_g{gammat}'
     if spdf: mycanvas.save_pdf(info_name)
     if sroot: mycanvas.save_root(info_name)
+
+def identification_moq_window(moq_cen, moq_span, ref_nuclei, ref_charge, brho, gammat, lise, harmonics, filename, data_time, skip_time, binning):
+    
+    moqs_in_window = get_all_in_moq_window(moq_cen, moq_span)
+    mydata = ImportData(ref_nuclei, ref_charge, brho, gammat)
+    mydata._set_secondary_args(lise, harmonics)
+    mydata._set_tertiary_args(filename, data_time, skip_time, binning)
+    mydata._exp_data()
+    mydata._calculate_srrf(moqs_in_window)
+    mydata._simulated_data(particles = True)
+    mycanvas = CreateGUI(ref_nuclei, mydata.nuclei_names, 1, 0)
+    mycanvas._view(mydata.exp_data, mydata.simulated_data_dict, filename)
+    '''
+    Example 1: moq_cen = 2.054, moq_span = 0.002, ref_charge = 32, ref_nuclei = '72Ge', brho = 6.937117, gammat = 1.395, lise = 'e.lpp', harmonics = [200]
+    filename = '/lustre/ap/litv-exp/2021-07-03_E143_TwoPhotonDecay_ssanjari/analyzers/410/410MHz-2021.07.02.17.58.30.204.tiq', data_time = 10, skip_time = 2.5, binning = 2048
+    Example 2: brho = 6.980882, gammat = 1.395, harmonics = [120], #filename = '/lustre/ap/litv-exp/2021-07-03_E143_TwoPhotonDecay_ssanjari/analyzers/245/245MHz-2021.07.02.17.58.56.521.tiq'
+    filename = '/lustre/ap/litv-exp/2021-07-03_E143_TwoPhotonDecay_ssanjari/ntcap/iq/IQ_2021-06-30_23-27-34_part3/0002757.iq.tdms', data_time = 10, skip_time = 2.3, binning = 4096
+    '''
+    
+def get_energy_isomer_deltaf(charge, zz, nn, ref_iso, brho, gammat, delta_f, harmonic):
+    '''
+    Example: 72 Br, harmonic = 200, charge = 35, ref_iso = '72Br', ref_nuclei = f'{ref_iso}+{charge}', brho = 6.937117, gammat = 1.056, delta_f = 549
+    Example: 72 Ge-> harmonic = 209, zz = 32, nn = 40, charge = 32, ref_iso = '72Ge', brho = 6.9303, gammat = 1.5, delta_f = 1.85e3
+    '''
+    imp = ImportData(ref_iso, charge, brho, gammat)
+    imp.calculate_moqs([Particle(zz, nn, AMEData(), imp.ring)])
+    imp._calculate_srrf()
+    e_isomer = get_energy_isomer(delta_f, imp.moq[ref_nuclei], charge, imp.frequence_rel, gammat, harmonic)
+    print(e_isomer)
 
 if __name__ == '__main__':
     main()
