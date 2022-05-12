@@ -58,7 +58,7 @@ def main():
     if args.iroot: identification_root(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
     if args.icsv: identification_csv(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
     if args.introot: identification_ntcap_root(args.filename[0], args.lise_file, args.harmonics, args.brho, args.gammat, args.refisotope, args.refcharge, args.ndivs, args.dops, args.spdf, args.sroot)
-    if args.imoq: identification_moq_window(args.moq_cen, args.moq_span, args.ref_nuclei, args.ref_charge, args.brho, args.gammat, args.lise_file, args.harmonics, args.filename[0], args.data_time, args.skip_time, args.binning):
+    if args.imoq: identification_moq_window(args.moq_cen, args.moq_span, args.ref_nuclei, args.ref_charge, args.brho, args.gammat, args.lise_file, args.harmonics, args.filename[0], args.data_time, args.skip_time, args.binning)
     
     #if args.read:
     controller2
@@ -66,17 +66,6 @@ def main():
 def read_masterfile(master_filename):
     # reads list filenames with experiment data. [:-1] to remove eol sequence.
     return [file[:-1] for file in open(master_filename).readlines()]
-
-def read_csv(filename):
-    f = np.array([])
-    p = np.array([])
-    with open(filename) as f:
-        cont = f.readlines()[1:]
-        for l in cont:
-            l = l.split('|')
-            f = np.append(f, float(l[0]))
-            p = np.append(p, float(l[1]))
-    return (np.stack((f, p), axis = 1).reshape((len(f), 2)))
 
 def ntcap_data(filename, lframes = 2**18, data_time = 1, skip_time = 2,csv = False, root = False, plot = False, read_all = False):
     iq = get_iq_object(filename)
@@ -128,26 +117,6 @@ def identification_root(filename, lise_file, harmonics, brho, gammat, refisotope
     if spdf: mycanvas.save_pdf(info_name)
     if sroot: mycanvas.save_root(info_name)
 
-def identification_csv(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot):
-    
-    '''
-    We read the experimental data from a csv file containing frecuency and power
-    '''
-    
-    exp_data = read_csv(filename)
-    mydata = ImportData(refisotope, refcharge, brho, gammat)
-    mydata._set_secondary_args(lise_file, harmonics)
-    mydata._calculate_srrf() # -> moq ; srrf
-    mydata._simulated_data() # -> simulated frecs
-                                                   
-    mycanvas = CreateGUI(refisotope, mydata.nuclei_names, ndivs, dops)
-    mycanvas._view(exp_data, mydata.simulated_data_dict, filename)
-    
-    date_time = datetime.now().strftime('%Y.%m.%d_%H.%M.%S')
-    info_name = f'{outfilepath}{date_time}_b{brho}_g{gammat}'
-    if spdf: mycanvas.save_pdf(info_name)
-    if sroot: mycanvas.save_root(info_name)
-    
 def identification_ntcap(filename, lise_file, harmonics, brho, gammat, refisotope, refcharge, ndivs, dops, spdf, sroot, data_time, skip_time):
     
     '''
@@ -215,9 +184,56 @@ def get_energy_isomer_deltaf(charge, zz, nn, ref_iso, brho, gammat, delta_f, har
     '''
     imp = ImportData(ref_iso, charge, brho, gammat)
     imp.calculate_moqs([Particle(zz, nn, AMEData(), imp.ring)])
+    
     imp._calculate_srrf()
     e_isomer = get_energy_isomer(delta_f, imp.moq[ref_nuclei], charge, imp.frequence_rel, gammat, harmonic)
     print(e_isomer)
 
+def determine_deltaf_betweentwopartiucles():
+    ring = Ring('ESR', 108.4) # 108.43 Ge
+    p1 = Particle(36, 36, AMEData(), ring)
+    p4 = Particle(36, 36, AMEData(), ring)
+    p2 = Particle(35, 37, AMEData(), ring)
+    p3 = Particle(35, 37, AMEData(), ring)
+    p5 = Particle(34, 36, AMEData(), ring)
+    p6 = Particle(21, 16, AMEData(), ring)
+    p3.qq = 34
+    p4.qq = 35
+    p6.qq = 21
+    moq1 = p1.get_ionic_moq_in_u()
+    moq2 = p2.get_ionic_moq_in_u()
+    moq3 = p3.get_ionic_moq_in_u()
+    moq4 = p4.get_ionic_moq_in_u()
+    moq5 = p5.get_ionic_moq_in_u()
+    moq6 = p5.get_ionic_moq_in_u()
+    deltamoq = abs(moq6 -moq4)
+    moqratio = deltamoq / moq4
+    # m2 = AMEData.to_mev(moq2 * p2.qq)
+    # gamma = 
+    deltaf = moqratio * 406.386 * 10**6 * (1 / 1.4**2)
+    print(deltaf, moq1, moq2, moq3, moq4, moq5, moq6)
+
+def calculate_moq_from_deltaf():
+    deltaf = 12.5*10**3
+    meassured_ref_frequency = 406.886 * 10**6
+    gammat = 1.3956
+    ref_moq = 2.054784866998157
+    return deltaf / meassured_ref_frequency * ref_moq * gammat**2 + ref_moq
+
+def something():
+    moq_of_unknown_particle = calculate_moq_from_deltaf()
+    possible_particles = get_all_in_moq_window(moq_of_unknown_particle, 0.001)
+    print(possible_particles)
+def something2():
+    ring = Ring('ESR', 108.4) # 108.43 Ge
+    #Se70 = Particle(34, 36, AMEData(), ring)
+    p = Particle(35, 37, AMEData(), ring)
+    mass = AMEData.to_mev(p.get_ionic_moq_in_u() * p.qq)
+    print(mass)
+
 if __name__ == '__main__':
-    main()
+    #main()
+    determine_deltaf_betweentwopartiucles()
+    #calculate_moq_from_deltaf()
+    #something()
+    #something2()
