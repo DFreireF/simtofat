@@ -274,8 +274,8 @@ def correct_shift(xx, yy, zz, every = 7):
 def basic_visualization(filename, lframes, time, skip, fcen, fspan):
     xx, yy, zz = read_and_cut_in_frecuency(filename, lframes, time, skip, fcen, fspan)
     axx, ayy, azz = get_averaged_spectrogram(xx, yy, zz, len(xx[:,0]))
-    filename = os.path.basename(f)
-    plot_spectrogram(xx, yy, zz, title = filename)
+    file = os.path.basename(filename)
+    plot_spectrogram(xx, yy, zz, title = file)
     plt.show()
     fig = plot_interactive_spectrum(axx[0,:], azz[0,:])
     fig.show()
