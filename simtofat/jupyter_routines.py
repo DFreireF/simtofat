@@ -1,4 +1,5 @@
 from iqtools import *
+from lmfit import *
 import plotly.express as px
 import pandas as pd
 import os
@@ -240,7 +241,7 @@ def power_frame_average(ziso, zg, zb, timestep, every = 3):
     #fig.write_html('/u/litv-exp/personal_directories/dfreiref/72Br/spectrum_isoVSgsVStotal2.html')
     fig.show()
     
-def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = True):
+def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, show = False):
     # f(t,p) ; t(p,f) ; p(t,f)
     freq_average_per_tframe = dict()
     deltas, nzz = [np.array([]) for i in range(0,2)]
@@ -276,11 +277,49 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = True):
         else: nzz = np.append(nzz, zz[int(key), :])
     nzz = np.reshape(nzz, np.shape(zz))
     
-    if cooling: xx = xx + xx[0, int(-deltas[-1] + ref)] 
-    else heating: xx = xx + heating_freq
-    if change_ref: xx = xx - heating_freq
+    if cooling: xx = xx + xx[0, int(-deltas[-1] + ref_index)] 
+    elif change_ref: xx = xx - heating_freq
+    else: xx = xx + heating_freq 
+
+    deltax = abs(xx[0,0] - xx[0,1])
+    deltay = abs(yy[0,0] - yy[1,0])
+    deltas = reversed(deltas)
     
-    return xx, yy[::-1], nzz, deltas[::-1]
+    shift = {'Time (s)' : np.array([i * deltay for i, _ in enumerate(deltas)])}
+    shift['Deltas'] = np.array([delta for delta in deltas])
+    if show:
+        fig = px.line(x = shift['Time (s)'], y = shift['Deltas'], markers = True)
+        fig.show()
+
+    a, b, c = fit_decay(shift['Time (s)'], shift['Deltas'])
+    fitted_shift = np.array([decay_curve(time, a, b, c) for time in shift['Time (s)']])
+    distance = [np.abs(fitted_shift[i] - delta) for i, delta in enumerate(shift['Deltas'])]
+    for i, dist in enumerate(distance):
+        if dist > np.abs(7 * fitted_shift[i]):
+            nzz[i] = np.roll(nzz[i], int(dist))
+            deltas[i] = int(fitted_shift[i])
+
+    shift['Frequency (Hz)'] = np.array([delta * deltax for delta in deltas])
+    if show:
+        fig = px.line(shift['Time (s)'], y = deltas, markers = True)
+        fig.show()
+        
+    return xx, yy[::-1], nzz, deltas
+
+def decay_curve(x, a, b, c):#for the lifetime calculation
+    return a + b * np.exp(-x*c)
+
+def fit_decay(x, y, seed_a = 0, seed_b = 1, seed_c = 1, fit_report = False):
+    gmodel = Model(decay_curve)
+    result = gmodel.fit(y, x = x, a = seed_a, b = seed_b, c = seed_c)
+    if fit_report:
+        plt.plot(x, result.best_fit, '-', label = 'best fit')
+        plt.plot(x,y)
+        plt.legend()
+        plt.show()
+        print(result.fit_report())
+        
+    return result.params['a'].value, result.params['b'].value, result.params['c'].value
 
 def basic_visualization(filename, lframes, time, skip, fcen, fspan):
     xx, yy, zz = read_and_cut_in_frecuency(filename, lframes, time, skip, fcen, fspan)
