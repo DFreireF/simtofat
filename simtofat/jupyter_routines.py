@@ -240,40 +240,47 @@ def power_frame_average(ziso, zg, zb, timestep, every = 3):
     #fig.write_html('/u/litv-exp/personal_directories/dfreiref/72Br/spectrum_isoVSgsVStotal2.html')
     fig.show()
     
-def correct_shift(xx, yy, zz, every = 7, heating = False):
-    # xx, yy, zz -> Spectrogram variables
+def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = True):
     # f(t,p) ; t(p,f) ; p(t,f)
     freq_average_per_tframe = dict()
-    ref = -1
     deltas, nzz = [np.array([]) for i in range(0,2)]
     
-    for time_frame, _ in enumerate((zz[:,0])):
+    # First we look for our reference    
+    maximum = -1
+    for freq_frame, _ in enumerate(zz[0, :]):
+        power = np.average(zz[:, freq_frame])
+        if power > maximum:
+            maximum = power
+            heating_freq = xx[0, freq_frame]
+            ref_index = freq_frame
+    
+    for time_frame, _ in enumerate(zz[:, 0]):
         freq_average = np.array([])
-        i = 0
-        while (i + every <= len(zz[0,:])):
-            imin = i
-            imax = i + every
+        j = 0
+        while (j + size <= len(zz[0, :])):
+            imin = j
+            imax = j + size
             freq_average = np.append(freq_average, np.average(zz[time_frame, imin:imax]))
             freq_average_per_tframe[f'{time_frame}'] = freq_average
-            i = i + 1
-            
-    if heating: freq_average_per_frame = reversed(freq_average_per_tframe)
-    for key in freq_average_per_tframe:
+            j = j + 1
+
+    for key in reversed(freq_average_per_tframe):
         max = freq_average_per_tframe[key][:].max()
         min = freq_average_per_tframe[key][:].min()
         if max >= 1.4 * min:
             index_max = np.argmax(freq_average_per_tframe[key][:])
-            index_max_f = int((index_max + index_max + every - 1) / 2) # This has to be integer, if every is even (like 5,7,9)
-            if ref == -1:
-                ref = index_max_f
-                delta = 0
-            else: delta = ref - index_max_f
+            index_max_f = int((index_max + index_max + size - 1) / 2) # This has to be integer, if every is even (like 5,7,9)
+            delta = ref_index - index_max_f
             nzz = np.append(nzz, np.roll(zz[int(key), :], delta))
             deltas = np.append(deltas, delta)
         else: nzz = np.append(nzz, zz[int(key), :])
     nzz = np.reshape(nzz, np.shape(zz))
-    if heating: return xx, yy[::-1], nzz[::-1], deltas[::-1]
-    else: return xx, yy, nzz, deltas
+    
+    if cooling: xx = xx + xx[0, int(-deltas[-1] + ref)] 
+    else heating: xx = xx + heating_freq
+    if change_ref: xx = xx - heating_freq
+    
+    return xx, yy[::-1], nzz, deltas[::-1]
 
 def basic_visualization(filename, lframes, time, skip, fcen, fspan):
     xx, yy, zz = read_and_cut_in_frecuency(filename, lframes, time, skip, fcen, fspan)
