@@ -285,18 +285,11 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
 
     shift = {'Time (s)' : np.array([i * deltay for i, _ in enumerate(deltas)])}
     shift['Deltas'] = np.array([delta for delta in deltas])
-                               
-    fit_report = False
-    if show:
-        fit_report = True
-        fig = px.line(x = shift['Time (s)'], y = shift['Deltas'], markers = True)
-        fig.show()
 
-    a, b, c = fit_decay(shift['Time (s)'], shift['Deltas'], fit_report = fit_report)
+    a, b, c = fit_decay(shift['Time (s)'], shift['Deltas'])
     fitted_shift = np.array([decay_curve(time, a, b, c) for time in shift['Time (s)']])
     
     distance = [np.abs(fitted_shift[i] - delta) for i, delta in enumerate(shift['Deltas'])]
-    print(fitted_shift, distance)
     for i, dist in enumerate(distance):
         if dist > np.abs(5 * fitted_shift[i]):
             nzz[i] = np.roll(nzz[i], int(dist))
@@ -304,8 +297,11 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
 
     shift['Frequency (Hz)'] = np.array([delta * deltax for delta in deltas])
     if show:
-        fig = px.line(x = shift['Time (s)'], y = shift['Frequency (Hz)'], markers = True)
-        fig.show()
+        df = pd.DataFrame(shift)
+        figi = px.line(df, x = 'Time (s)', y = 'Deltas', markers = True, title = 'Before fit correction')
+        figi.show()
+        figf = px.line(df, x = 'Time (s)', y = 'Frequency (Hz)', markers = True, title = 'After fit correction')
+        figf.show()
         
     return xx, yy[::-1], nzz, deltas
 
@@ -332,3 +328,7 @@ def basic_visualization(filename, lframes, time, skip, fcen, fspan):
     plt.show()
     fig = plot_interactive_spectrum(axx[0,:], azz[0,:])
     fig.show()
+    
+def read_masterfile(master_filename):
+    # reads list filenames with experiment data. [:-1] to remove eol sequence.
+    return [file[:-1] for file in open(master_filename).readlines()]
