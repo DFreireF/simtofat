@@ -268,14 +268,13 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
     for key in reversed(freq_average_per_tframe):
         max = freq_average_per_tframe[key][:].max()
         min = freq_average_per_tframe[key][:].min()
-        if max >= 1.4 * min:
-            index_max = np.argmax(freq_average_per_tframe[key][:])
-            index_max_f = int((index_max + index_max + size - 1) / 2) # This has to be integer, if every is even (like 5,7,9)
-            delta = ref_index - index_max_f
-            nzz = np.append(nzz, np.roll(zz[int(key), :], delta))
-            deltas = np.append(deltas, delta)
-        else: nzz = np.append(nzz, zz[int(key), :])
+        index_max = np.argmax(freq_average_per_tframe[key][:])
+        index_max_f = int((index_max + index_max + size - 1) / 2) # This has to be integer, if every is even (like 5,7,9)
+        delta = ref_index - index_max_f
+        nzz = np.append(nzz, np.roll(zz[int(key), :], delta))
+        deltas = np.append(deltas, delta)
     nzz = np.reshape(nzz, np.shape(zz))
+    deltas = deltas[::-1]
     
     if cooling: xx = xx + xx[0, int(-deltas[-1] + ref_index)] 
     elif change_ref: xx = xx - heating_freq
@@ -283,25 +282,29 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
 
     deltax = abs(xx[0,0] - xx[0,1])
     deltay = abs(yy[0,0] - yy[1,0])
-    deltas = reversed(deltas)
-    
+
     shift = {'Time (s)' : np.array([i * deltay for i, _ in enumerate(deltas)])}
     shift['Deltas'] = np.array([delta for delta in deltas])
+                               
+    fit_report = False
     if show:
+        fit_report = True
         fig = px.line(x = shift['Time (s)'], y = shift['Deltas'], markers = True)
         fig.show()
 
-    a, b, c = fit_decay(shift['Time (s)'], shift['Deltas'])
+    a, b, c = fit_decay(shift['Time (s)'], shift['Deltas'], fit_report = fit_report)
     fitted_shift = np.array([decay_curve(time, a, b, c) for time in shift['Time (s)']])
+    
     distance = [np.abs(fitted_shift[i] - delta) for i, delta in enumerate(shift['Deltas'])]
+    print(fitted_shift, distance)
     for i, dist in enumerate(distance):
-        if dist > np.abs(7 * fitted_shift[i]):
+        if dist > np.abs(5 * fitted_shift[i]):
             nzz[i] = np.roll(nzz[i], int(dist))
             deltas[i] = int(fitted_shift[i])
 
     shift['Frequency (Hz)'] = np.array([delta * deltax for delta in deltas])
     if show:
-        fig = px.line(shift['Time (s)'], y = deltas, markers = True)
+        fig = px.line(x = shift['Time (s)'], y = shift['Frequency (Hz)'], markers = True)
         fig.show()
         
     return xx, yy[::-1], nzz, deltas
