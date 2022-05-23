@@ -210,6 +210,28 @@ def study_iso_gs_average_power(file, lframes = 2048, time = 20, skip = 0, xcen =
     
     timestep = yy[1,0] - yy[0,0]
     power_frame_average(zzi, zzg, zzb, timestep, every = every)
+
+def study_iso_gs_average_power_light(xx, yy, zz, xceni = -2.7e2, xceng = 20, xcenb = 1e3, xspan = 3e2, ycen = None, yspan = None, every = 3):
+    #iso state
+    xxi, yyi, zzi = get_cut_spectrogram(xx, yy, zz, xcen = xceni, 
+                                        xspan = xspan, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxi, yyi, zzi)
+    plt.show()
+    
+    #ground state
+    xxg, yyg, zzg = get_cut_spectrogram(xx, yy, zz, xcen = xceng, 
+                                           xspan = xspan, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxg, yyg, zzg,)
+    plt.show()
+    
+    #background
+    xxb, yyb, zzb = get_cut_spectrogram(xx, yy, zz, xcen = xcenb, 
+                                           xspan = xspan, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxb, yyb, zzb)
+    plt.show()
+    
+    timestep = yy[1,0] - yy[0,0]
+    power_frame_average(zzi, zzg, zzb, timestep, every = every)
     
 def power_frame_average(ziso, zg, zb, timestep, every = 3):
     apfi = [np.average(ziso[i, :]) for i in range(len(ziso[:,0]))]
@@ -241,12 +263,12 @@ def power_frame_average(ziso, zg, zb, timestep, every = 3):
     #fig.write_html('/u/litv-exp/personal_directories/dfreiref/72Br/spectrum_isoVSgsVStotal2.html')
     fig.show()
     
-def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, show = False):
+def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change_ref = False, show = False):
     # f(t,p) ; t(p,f) ; p(t,f)
     freq_average_per_tframe = dict()
     deltas, nzz = [np.array([]) for i in range(0,2)]
     
-    # First we look for our reference    
+    # First we look for our reference / pattern 
     maximum = -1
     for freq_frame, _ in enumerate(zz[0, :]):
         power = np.average(zz[:, freq_frame])
@@ -254,6 +276,7 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
             maximum = power
             heating_freq = xx[0, freq_frame]
             ref_index = freq_frame
+    zero_index = np.argmin(np.abs(xx[0, :]))
     
     for time_frame, _ in enumerate(zz[:, 0]):
         freq_average = np.array([])
@@ -266,19 +289,17 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
             j = j + 1
 
     for key in reversed(freq_average_per_tframe):
-        max = freq_average_per_tframe[key][:].max()
-        min = freq_average_per_tframe[key][:].min()
         index_max = np.argmax(freq_average_per_tframe[key][:])
-        index_max_f = int((index_max + index_max + size - 1) / 2) # This has to be integer, if every is even (like 5,7,9)
+        index_max_f = int((index_max + index_max + size - 1) / 2)
         delta = ref_index - index_max_f
+        if change_ref: delta = delta + (zero_index - ref_index)
         nzz = np.append(nzz, np.roll(zz[int(key), :], delta))
         deltas = np.append(deltas, delta)
     nzz = np.reshape(nzz, np.shape(zz))
     deltas = deltas[::-1]
     
     if cooling: xx = xx + xx[0, int(-deltas[-1] + ref_index)] 
-    elif change_ref: xx = xx - heating_freq
-    else: xx = xx + heating_freq 
+    elif heating: xx = xx + heating_freq 
 
     deltax = abs(xx[0,0] - xx[0,1])
     deltay = abs(yy[0,0] - yy[1,0])
@@ -291,7 +312,7 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, change_ref = False, sho
     
     distance = [np.abs(fitted_shift[i] - delta) for i, delta in enumerate(shift['Deltas'])]
     for i, dist in enumerate(distance):
-        if dist > np.abs(5 * fitted_shift[i]):
+        if dist > np.abs(2 * fitted_shift[i]):
             nzz[i] = np.roll(nzz[i], int(dist))
             deltas[i] = int(fitted_shift[i])
 
@@ -328,7 +349,3 @@ def basic_visualization(filename, lframes, time, skip, fcen, fspan):
     plt.show()
     fig = plot_interactive_spectrum(axx[0,:], azz[0,:])
     fig.show()
-    
-def read_masterfile(master_filename):
-    # reads list filenames with experiment data. [:-1] to remove eol sequence.
-    return [file[:-1] for file in open(master_filename).readlines()]
