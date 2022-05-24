@@ -10,7 +10,7 @@ def read_masterfile(master_filename):
     # reads list filenames with experiment data. [:-1] to remove eol sequence.                        
     return [file[:-1] for file in open(master_filename).readlines()]
 
-def read_and_cut_in_frecuency(filename, lframes, time, skip, xcen, xspan):
+def read_and_cut_in_frecuency(filename, lframes, time, skip, xcen, xspan, method = None):
     #get iq object
     iq = get_iq_object(filename)
     #select range to read
@@ -18,7 +18,8 @@ def read_and_cut_in_frecuency(filename, lframes, time, skip, xcen, xspan):
     sframes = int(skip * iq.fs / lframes)
     #read
     iq.read(nframes = nframes, lframes = lframes, sframes = sframes)
-    iq.method = 'mtm' #'fft', 'mtm', 'welch'
+    if method: iq.method = method
+    else: iq.method = 'mtm' #'fft', 'mtm', 'welch'
     #create spectrogram
     xx, yy, zz = iq.get_spectrogram(nframes, lframes) #f=x[t,p], t=y[p,f], p=z[t,f]
     #cut spectrogram in frecuency
@@ -101,7 +102,7 @@ def generate_2D1Dshow_filelist(filelist, lframes = 2048, time = 20, skip = 0, ce
         plt.plot(axx[0,:], azz[0,:])
         plt.show()
         
-def plot_interactive_spectrogram(xx, yy, zz, title = 'Spectrogram'):
+def plot_interactive_spectrogram(xx, yy, zz, title = 'Spectrogram', dbm = False):
     frequency_kHz = [f'{x:0.3f}' for x in xx[0,:]/1000]
     time = [f'{y:0.3f}' for y in yy[:,0]]
     norm_power = zz / zz.max()
@@ -146,10 +147,11 @@ def plot_interactive_spectrogram(xx, yy, zz, title = 'Spectrogram'):
         )
     return fig
 
-def plot_interactive_spectrum(x, y):
+def plot_interactive_spectrum(x, y, dbm = False):
     frequency_kHz = [f'{x:0.3f}' for x in x/1000]
-    norm_power = [p/y.max() for p in y]
-    fig = px.line(x = frequency_kHz, y = norm_power, markers = True)
+    if dbm: power = IQBase.get_dbm(y)
+    else: power = [p/y.max() for p in y]
+    fig = px.line(x = frequency_kHz, y = power, markers = True)
     fig.update_layout(
         xaxis = dict(
             showline = True,
