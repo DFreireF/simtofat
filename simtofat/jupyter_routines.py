@@ -132,6 +132,7 @@ def plot_interactive_spectrogram(xx, yy, zz, title = '', zmin = 0, zmax = 1e6, s
             tickfont_size = 15,
             showgrid = False,
             nticks = 10)
+    )
     return fig
 
 def plot_interactive_spectrogram_img(xx, yy, zz, title = 'Spectrogram', dbm = False):
