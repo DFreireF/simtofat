@@ -1,6 +1,7 @@
 from iqtools import *
 from lmfit import *
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
@@ -102,20 +103,51 @@ def generate_2D1Dshow_filelist(filelist, lframes = 2048, time = 20, skip = 0, ce
         plt.plot(axx[0,:], azz[0,:])
         plt.show()
         
-def plot_interactive_spectrogram(xx, yy, zz, title = 'Spectrogram', dbm = False):
+def plot_interactive_spectrogram(xx, yy, zz, title = '', zmin = 0, zmax = 1e6, showscale = False, colorscale = 'jet', height = 500, width = 900):
+    
+    fig = go.Figure(data = go.Heatmap(z = zz, x = xx[0,:], y = yy[:,0],
+                                      zmax = zmax, zmin = zmin,
+                                      colorscale = colorscale, showscale = showscale))
+    
+    fig.update_layout(title = title, height = height, width = width,
+                      
+        xaxis = dict(
+            showline = True,
+            mirror = "ticks",
+            linewidth = 2,
+            ticks = "inside",
+            title_text="Frequency (kHz)",
+            title_font_size = 19,
+            tickfont_size = 15,
+            showgrid = True,
+            nticks = 10),
+                      
+        yaxis = dict(
+            showline = True,
+            mirror = "ticks",
+            linewidth = 2,
+            ticks = "inside",
+            title_text = "Time (s)",
+            title_font_size = 19,
+            tickfont_size = 15,
+            showgrid = False,
+            nticks = 10)
+    return fig
+
+def plot_interactive_spectrogram_img(xx, yy, zz, title = 'Spectrogram', dbm = False):
+    
     frequency_kHz = [f'{x:0.3f}' for x in xx[0,:]/1000]
     time = [f'{y:0.3f}' for y in yy[:,0]]
-    norm_power = zz / zz.max()
+    if dbm: power = IQBase.get_dbm(y)
+    else: power = zz / zz.max()
     
-    panda_df = pd.DataFrame(data = norm_power, 
+    panda_df = pd.DataFrame(data = power, 
                             index = time, 
                             columns = frequency_kHz)
 
     fig = px.imshow(panda_df, color_continuous_scale = 'jet', origin = 'lower')
     fig.update_layout(
         title = title,
-        #font_family="Avenir",
-        #hoverlabel_font_family="Avenir",
         coloraxis_showscale=False,
         xaxis = dict(
             showline = True,
@@ -142,8 +174,8 @@ def plot_interactive_spectrogram(xx, yy, zz, title = 'Spectrogram', dbm = False)
         coloraxis_colorbar = dict(
             orientation = 'h',
         ),
-        height = 1080,
-        width = 1980
+        height = 500,
+        width = 900
         )
     return fig
 
