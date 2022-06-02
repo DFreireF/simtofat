@@ -103,7 +103,7 @@ def generate_2D1Dshow_filelist(filelist, lframes = 2048, time = 20, skip = 0, ce
         plt.plot(axx[0,:], azz[0,:])
         plt.show()
         
-def plot_interactive_spectrogram(xx, yy, zz, title = '', zmin = 0, zmax = 1e6, showscale = False, colorscale = 'jet', height = 500, width = 900):
+def plot_interactive_spectrogram(xx, yy, zz, title = None, zmin = None, zmax = None, showscale = False, colorscale = 'jet', height = 500, width = 900):
     
     fig = go.Figure(data = go.Heatmap(z = zz, x = xx[0,:], y = yy[:,0],
                                       zmax = zmax, zmin = zmin,
@@ -362,16 +362,14 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change
     return xx, yy[::-1], nzz, deltas
 
 def decay_curve(x, a, b, c):#for the lifetime calculation
-    return a + b * np.exp(-x*c)
+    return a + b * np.exp(-x/c)
 
 def fit_decay(x, y, seed_a = 0, seed_b = 1, seed_c = 1, fit_report = False):
     gmodel = Model(decay_curve)
     result = gmodel.fit(y, x = x, a = seed_a, b = seed_b, c = seed_c)
     if fit_report:
-        plt.plot(x, result.best_fit, '-', label = 'best fit')
-        plt.plot(x,y)
-        plt.legend()
-        plt.show()
+        fig = px.line(x = x, y = [result.best_fit, y], markers = True)
+        fig.show()
         print(result.fit_report())
         
     return result.params['a'].value, result.params['b'].value, result.params['c'].value
@@ -384,3 +382,83 @@ def basic_visualization(filename, lframes, time, skip, fcen, fspan):
     plt.show()
     fig = plot_interactive_spectrum(axx[0,:], azz[0,:])
     fig.show()
+
+def power_frame_average_half(ziso, zg, zb, zh1, zh2, timestep, every = 1):
+    apfi = [np.average(ziso[i, :]) for i in range(len(ziso[:,0]))]
+    apfg = [np.average(zg[i, :]) for i in range(len(zg[:,0]))]
+    apfb = [np.average(zb[i, :]) for i in range(len(zb[:,0]))]
+    
+    apfih1 = [np.average(zh1[i, :]) for i in range(len(zh1[:,0]))]
+    apfih2 = [np.average(zh2[i, :]) for i in range(len(zh2[:,0]))]
+
+    napfi = list()
+    napfih2 = list()
+    napfih1 = list()
+    napfg = list()
+    napfb = list()
+    t = list()
+    i = 0
+    
+    while (i * every + every <= len(apfi)):
+        imin = i * every
+        imax = i * every + every
+        napfi.append(np.average(apfi[imin:imax]))
+        
+        napfih1.append(np.average(apfih1[imin:imax]))
+        napfih2.append(np.average(apfih2[imin:imax]))
+        
+        napfg.append(np.average(apfg[imin:imax]))
+        napfb.append(np.average(apfb[imin:imax]))
+        t.append(imax*timestep)
+        i = i+1
+
+    data_dict = dict()
+    data_dict['Isomer'] = napfi
+    data_dict['Isomer_half1'] = napfih1
+    data_dict['Isomer_half2'] = napfih2
+    data_dict['Ground State'] = napfg
+    data_dict['Background'] = napfb
+    df = pd.DataFrame(data = data_dict)
+
+    #total = [x + y for x, y in zip(averaged_power_frame_g, averaged_power_frame_iso)]
+    fig = px.line(df, x = t, y = ['Isomer', 'Ground State', 'Background', 'Isomer_half1', 'Isomer_half2'], markers = True)
+    #fig.write_html('/u/litv-exp/personal_directories/dfreiref/72Br/spectrum_isoVSgsVStotal2.html')
+    fig.show()
+    return napfi, napfih1, napfih2
+    
+def study_iso_gs_average_power_half(xx, yy, zz, xceni = -2.7e2, xceng = 20, xcenb = 1e3, xspan = 3e2, ycen = None, yspan = None, every = 1):
+    #iso state
+    xxi, yyi, zzi = get_cut_spectrogram(xx, yy, zz, xcen = xceni, 
+                                        xspan = xspan, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxi, yyi, zzi)
+    plt.show()
+    
+    cenh1 = xceni - xspan / 4
+    spanh1 = xspan / 2
+    cenh2 = xceni + xspan / 4
+    spanh2 = xspan / 2
+    xxh1, yyh1, zzh1 = get_cut_spectrogram(xx, yy, zz, xcen = cenh1, 
+                                        xspan = spanh1, ycen = ycen , yspan = yspan)
+    xxh2, yyh2, zzh2 = get_cut_spectrogram(xx, yy, zz, xcen = cenh2, 
+                                        xspan = spanh2, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxh1, yyh1, zzh1)
+    plt.show()
+    plot_spectrogram(xxh2, yyh2, zzh2 )
+    plt.show()
+    
+    #ground state
+    xxg, yyg, zzg = get_cut_spectrogram(xx, yy, zz, xcen = xceng, 
+                                           xspan = xspan, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxg, yyg, zzg,)
+    plt.show()
+    
+    #background
+    xxb, yyb, zzb = get_cut_spectrogram(xx, yy, zz, xcen = xcenb, 
+                                           xspan = xspan, ycen = ycen , yspan = yspan)
+    plot_spectrogram(xxb, yyb, zzb)
+    plt.show()
+    
+    timestep = yy[1,0] - yy[0,0]
+    napfi, napfih1, napfih2 = power_frame_average_half(zzi, zzg, zzb, zzh1, zzh2, timestep, every = every)
+    
+    return napfi, napfih1, napfih2

@@ -159,10 +159,10 @@ def identification_ntcap_root(filename, lise_file, harmonics, brho, gammat, refi
     if spdf: mycanvas.save_pdf(info_name)
     if sroot: mycanvas.save_root(info_name)
 
-def identification_moq_window(moq_cen, moq_span, ref_nuclei, ref_charge, brho, gammat, lise, harmonics, filename, data_time, skip_time, binning):
+def identification_moq_window(moq_cen, moq_span, ref_ion, ref_charge, brho, gammat, lise, harmonics, filename, data_time, skip_time, binning):
     
     moqs_in_window = get_all_in_moq_window(moq_cen, moq_span)
-    mydata = ImportData(ref_nuclei, ref_charge, brho, gammat)
+    mydata = ImportData(ref_ion, alphap)
     mydata._set_secondary_args(lise, harmonics)
     mydata._set_tertiary_args(filename, data_time, skip_time, binning)
     mydata._exp_data()
@@ -220,10 +220,31 @@ def calculate_moq_from_deltaf():
     ref_moq = 2.054784866998157
     return deltaf / meassured_ref_frequency * ref_moq * gammat**2 + ref_moq
 
-def something():
-    moq_of_unknown_particle = calculate_moq_from_deltaf()
-    possible_particles = get_all_in_moq_window(moq_of_unknown_particle, 0.001)
-    print(possible_particles)
+def candidates_by_moq_terminal(moq_of_unknown_particle, span = 0.001): #updated
+    possible_particles = get_all_in_moq_window(moq_of_unknown_particle, span)
+    return possible_particles
+
+def candidates_by_moq_terminal_2(moq_of_unknown_particle, span = 0.001): #new
+    possible_particles = get_all_in_moq_window(moq_of_unknown_particle, span)
+    MyData = ImportData(refion, alphap)
+    MyData._calculate_srrf(moqs = possible_particles, fref = fref)
+    MyData._simulated_data(particles = True)
+    return MyData.simulated_data_dict
+
+def candidates_by_moq(moq, refion, fref, alphap, span = 0.001): #new
+    possible_particles = get_all_in_moq_window(moq, span)
+    MyData = ImportData(refion, alphap)
+    MyData._calculate_srrf(moqs = possible_particles, fref = fref)
+    MyData._simulated_data(particles = True)
+    MyView = CreateGUI(refion, possible_particles.keys(), 4, 0, True)
+    MyView._view()
+
+def candidates_by_harmonic(particles, fcen, fspan):
+    compute srf particles
+    
+    multiply all of them by integers until they fall in fspan
+    print particle and frequency
+    
 def something2():
     ring = Ring('ESR', 108.4) # 108.43 Ge
     #Se70 = Particle(34, 36, AMEData(), ring)
