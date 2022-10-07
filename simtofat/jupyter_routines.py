@@ -22,7 +22,7 @@ def read_and_cut_in_frecuency(filename, lframes, time, skip, xcen, xspan, method
     if method: iq.method = method
     else: iq.method = 'mtm' #'fft', 'mtm', 'welch'
     #create spectrogram
-    xx, yy, zz = iq.get_spectrogram(nframes, lframes) #f=x[t,p], t=y[p,f], p=z[t,f]
+    xx, yy, zz = iq.get_power_spectrogram(nframes, lframes) #f=x[t,p], t=y[p,f], p=z[t,f]
     #cut spectrogram in frecuency
     nxx, nyy, nzz = get_cut_spectrogram(xx, yy, zz, xcen = xcen, xspan = xspan)
     #return array with cutted spectrogram
@@ -38,7 +38,7 @@ def read_and_get_spectrogram(filename, lframes, time, skip):
     iq.read(nframes = nframes, lframes = lframes, sframes = sframes)
     iq.method = 'mtm' #'fft', 'mtm', 'welch'
     #create spectrogram
-    xx, yy, zz = iq.get_spectrogram(nframes, lframes) #f=x[t,p], t=y[p,f], p=z[t,f]
+    xx, yy, zz = iq.get_power_spectrogram(nframes, lframes) #f=x[t,p], t=y[p,f], p=z[t,f]
     return xx, yy, zz
 
 def get_tiq_time(filename):
@@ -306,7 +306,7 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change
     # First we look for our reference / pattern 
     maximum = -1
     for freq_frame, _ in enumerate(zz[0, :]):
-        power = np.average(zz[:, freq_frame])
+        power = np.average(zz[6:, freq_frame])
         if power > maximum:
             maximum = power
             heating_freq = xx[0, freq_frame]
@@ -320,8 +320,8 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change
             imin = j
             imax = j + size
             freq_average = np.append(freq_average, np.average(zz[time_frame, imin:imax]))
-            freq_average_per_tframe[f'{time_frame}'] = freq_average
             j = j + 1
+        freq_average_per_tframe[f'{time_frame}'] = freq_average
 
     for key in reversed(freq_average_per_tframe):
         index_max = np.argmax(freq_average_per_tframe[key][:])
@@ -331,7 +331,6 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change
         nzz = np.append(nzz, np.roll(zz[int(key), :], delta))
         deltas = np.append(deltas, delta)
     nzz = np.reshape(nzz, np.shape(zz))
-    deltas = deltas[::-1]
     
     if cooling: xx = xx + xx[0, int(-deltas[-1] + ref_index)] 
     elif heating: xx = xx + heating_freq 
@@ -350,6 +349,7 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change
         if dist > np.abs(2 * fitted_shift[i]):
             nzz[i] = np.roll(nzz[i], int(dist))
             deltas[i] = int(fitted_shift[i])
+    deltas = deltas[::-1]
 
     shift['Frequency (Hz)'] = np.array([delta * deltax for delta in deltas])
     if show:
@@ -362,7 +362,7 @@ def correct_shift(xx, yy, zz, size = 7, cooling = False, heating = False, change
     return xx, yy[::-1], nzz, deltas
 
 def decay_curve(x, a, b, c):#for the lifetime calculation
-    return a + b * np.exp(-x/c)
+    return a + b * np.exp(-x*c) # be careful with /c, it provokes an np.exp()-> infinity overflow
 
 def fit_decay(x, y, seed_a = 0, seed_b = 1, seed_c = 1, fit_report = False):
     gmodel = Model(decay_curve)
@@ -462,3 +462,42 @@ def study_iso_gs_average_power_half(xx, yy, zz, xceni = -2.7e2, xceng = 20, xcen
     napfi, napfih1, napfih2 = power_frame_average_half(zzi, zzg, zzb, zzh1, zzh2, timestep, every = every)
     
     return napfi, napfih1, napfih2
+
+def read_masterfile(master_filename):
+    # reads list filenames with experiment data. [:-1] to remove eol sequence.
+    return [file[:-1] for file in open(master_filename).readlines()]
+
+def write_spectrum_to_csv(freq, power, filename, center = 0, out = None):
+    
+    concat_data = np.concatenate((freq, power, IQBase.get_dbm(power)))
+    final_data = np.reshape(concat_data, (3, -1)).T
+    if out:
+        filename = os.path.basename(filename)
+    file_name = f'{filename}.csv'
+    if out: file_name = os.path.join(out, file_name)
+    print(f'created file: {file_name}')
+    np.savetxt(file_name, final_data, header =
+               f'Delta f [Hz] @ {center} [Hz]|Power [W]|Power [dBm]', delimiter = '|')
+
+def write_tgraph(x,y,file = 'graph'):
+    from ROOT import TGraph, TFile
+    gra = TGraph(len(np.array(x)),np.array(x),np.array(y))
+    ffw = TFile(file+'.root', 'RECREATE')
+    gra.Write()
+    ffw.Close()
+    
+def write_etgraph(x,y,ey, ex = None, file = 'egraph'):
+    from ROOT import TGraphErrors, TFile
+    if ex == None: ex = np.zeros_like(ey)
+    egra = TGraphErrors(len(np.array(x)),np.array(x),np.array(y), np.array(ex), np.array(ey))
+    ffw = TFile(file+'.root', 'RECREATE')
+    egra.Write()
+    ffw.Close()
+    
+def write_spectrum_to_root(xx,yy,zz, filename = 'spectrum'):
+    #nxx4w,nyy4w[::-1],total_power4w[::-1]
+    from ROOT import TFile
+    histo = get_root_th2d(xx,yy,zz)
+    file = TFile(filename + '.root', 'RECREATE')
+    histo.Write()
+    file.Close()

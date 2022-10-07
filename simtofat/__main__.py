@@ -233,17 +233,18 @@ def candidates_by_moq_terminal_2(moq_of_unknown_particle, span = 0.001): #new
 
 def candidates_by_moq(moq, refion, fref, alphap, span = 0.001): #new
     possible_particles = get_all_in_moq_window(moq, span)
-    MyData = ImportData(refion, alphap)
-    MyData._calculate_srrf(moqs = possible_particles, fref = fref)
-    MyData._simulated_data(particles = True)
-    MyView = CreateGUI(refion, possible_particles.keys(), 4, 0, True)
-    MyView._view()
+    print(possible_particles)
+    #MyData = ImportData(refion, alphap)
+    #MyData._calculate_srrf(moqs = possible_particles, fref = fref)
+    #MyData._simulated_data(particles = True)
+    #MyView = CreateGUI(refion, MyData.nuclei_names, 1, 0, True)
+    #MyView._view()
 
-def candidates_by_harmonic(particles, fcen, fspan):
-    compute srf particles
+#def candidates_by_harmonic(particles, fcen, fspan):
+#    compute srf particles
     
-    multiply all of them by integers until they fall in fspan
-    print particle and frequency
+#    multiply all of them by integers until they fall in fspan
+#    print particle and frequency
     
 def something2():
     ring = Ring('ESR', 108.4) # 108.43 Ge
@@ -254,7 +255,10 @@ def something2():
 
 if __name__ == '__main__':
     #main()
-    determine_deltaf_betweentwopartiucles()
+    #determine_deltaf_betweentwopartiucles()
     #calculate_moq_from_deltaf()
     #something()
     #something2()
+    #candidates_by_moq(2.2470182028797723, '72Ge+32', 407095000, 0.513868, 0.0005)
+    #candidates_by_moq(2.054784866998157, '72Br+35', 407095000, 0.513868, 0.0015)
+    candidates_by_moq(2.056321608595159, '70Se+34', 407095000, 0.513868, 0.0015)

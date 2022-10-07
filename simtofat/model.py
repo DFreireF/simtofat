@@ -40,9 +40,9 @@ def import_particles_from_lise(lisefile):
     lise_data = lise_file.get_info_all()
     return lise_data
 
-def get_energy_isomer(delta_f, moq_gs, charge, fref, gammat, harmonic):
+def get_energy_isomer(delta_f, moq_gs, charge, fref, gammat):
     
-    moq_isomer = moq_gs * ( -delta_f / harmonic * gammat**2 / fref + 1)
+    moq_isomer = moq_gs * ( -delta_f * gammat**2 / fref + 1)
     energy_respect_gs = (moq_isomer - moq_gs) * charge
     return AMEData.to_mev(energy_respect_gs)
 
