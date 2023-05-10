@@ -239,7 +239,10 @@ def candidates_by_moq(moq, refion, fref, alphap, span = 0.001): #new
     #MyData._simulated_data(particles = True)
     #MyView = CreateGUI(refion, MyData.nuclei_names, 1, 0, True)
     #MyView._view()
-
+def candidates_by_moq2(moq1, moq2): #new
+    possible_particles = get_all_in_moq_window((moq1+moq2)/2, abs(moq1-moq2))
+    print(possible_particles)
+    
 #def candidates_by_harmonic(particles, fcen, fspan):
 #    compute srf particles
     
@@ -261,4 +264,7 @@ if __name__ == '__main__':
     #something2()
     #candidates_by_moq(2.2470182028797723, '72Ge+32', 407095000, 0.513868, 0.0005)
     #candidates_by_moq(2.054784866998157, '72Br+35', 407095000, 0.513868, 0.0015)
-    candidates_by_moq(2.056321608595159, '70Se+34', 407095000, 0.513868, 0.0015)
+    #candidates_by_moq(2.056321608595159, '70Se+34', 407095000, 0.513868, 0.0015)
+    #candidates_by_moq(2.2111796024681936, '58Fe+26', 407095000, 0.513868, 0.00065)
+    candidates_by_moq(2.2636146407183992, '568Zn+30', 407095000, 0.513868, 0.00065)
+    
